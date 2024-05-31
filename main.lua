@@ -120,6 +120,7 @@ local function shiftCellsDir(dir)
 end
 --BF handler Functions(Basically the part that actually executes the brainfuck code)
 local busy = false--debounce but idk busy feels like a better name for it
+
 local function execute(code)
 	if busy then return end-- if we'e executing code currently dont disturb
 	busy = true
@@ -128,6 +129,7 @@ local function execute(code)
 	ptVal = 1--set cell value to first cell
 	GraphicalOffset = 0
 	setGuiCell()--Set all cells to 0
+	local currentScope = {}
 	local codePt = 1--represents the index of the char in the string of code we're reading
 	local BF_Operators = {}--functions for +-<>
 	local function initCell()
@@ -192,20 +194,27 @@ local function execute(code)
 				CellValues[ptVal] = 0
 			end
 		elseif char == '[' then--open loop bracket
-			if loopPt then
-				warn('Invalid loop syntax')-- if there are two open brackets without a close bracket between it the user must've fucked up
-				break
-			end
-			loopPt = codePt -- set pt to for codePt to go back to when it meets the open bracket
-		elseif char == ']' then--close loop bracket
-			if not loopPt then
-				warn('Invalid loop syntax')-- if there is a close bracket without a open bracket before it the user must've fucked up somewhere
-				break
-			end
-			if CellValues[ptVal]==0 then
-				loopPt = nil--stop loop when current cell = 0. set loopPt to nil
+			if CellValues[ptVal]==0 then-- if loop starts when cell is zero skip to end
+				print(codePt)
+				local count = 1
+				while count~=0 do
+					codePt+=1 --checks that we go to the bracket pair
+					local theChar = string.sub(code,codePt,codePt)
+					if theChar==']' then
+						count-=1
+					elseif theChar=='[' then
+						count += 1
+					end
+				end
 			else
-				codePt = loopPt -- go back to the code pt set by open loop bracket
+				currentScope = {Start=codePt,lastScope=currentScope}
+			end
+			
+		elseif char == ']' then--close loop bracket
+			if CellValues[ptVal]==0 then
+				currentScope = currentScope.lastScope
+			else
+				codePt = currentScope.Start -- go back to the code pt set by open loop bracket
 			end
 		end
 		task.wait()-- just in case the loop is too fast somehow
@@ -222,3 +231,4 @@ game.ReplicatedStorage.Code.OnServerEvent:Connect(function(player,codeLocal) -- 
 	Output.Text = '' --reset output text
 	execute(codeLocal)--execute code
 end)
+
